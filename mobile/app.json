@@ -13,13 +13,17 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.unichat.app"
+      "bundleIdentifier": "com.unichat.app",
+      "infoPlist": {
+        "UIBackgroundModes": ["audio", "remote-notification"]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#300033"
       },
-      "package": "com.unichat.app"
+      "package": "com.unichat.app",
+      "permissions": ["WAKE_LOCK", "VIBRATE"]
     },
     "web": {
       "bundler": "metro"

@@ -9,6 +9,7 @@ interface User {
   email: string;
   displayName: string;
   avatar: string | null;
+  avatarPublicId?: string | null;
   status: 'online' | 'away' | 'busy' | 'offline';
   statusMessage: string;
   bio: string;
@@ -24,6 +25,7 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   isInitialized: boolean;
+  soundEnabled: boolean;
 }
 
 const initialState: AuthState = {
@@ -33,6 +35,7 @@ const initialState: AuthState = {
   isLoading: false,
   error: null,
   isInitialized: false,
+  soundEnabled: true,
 };
 
 export const register = createAsyncThunk(
@@ -115,6 +118,9 @@ const authSlice = createSlice({
     clearError(state) {
       state.error = null;
     },
+    setSoundEnabled(state, action: PayloadAction<boolean>) {
+      state.soundEnabled = action.payload;
+    },
   },
   extraReducers: (builder) => {
     // Register
@@ -167,5 +173,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { setUser, updateUserStatus, clearError } = authSlice.actions;
+export const { setUser, updateUserStatus, clearError, setSoundEnabled } = authSlice.actions;
 export default authSlice.reducer;

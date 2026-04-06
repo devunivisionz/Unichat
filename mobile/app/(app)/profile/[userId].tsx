@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, Alert,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -115,7 +116,11 @@ export default function ProfileScreen() {
             <LinearGradient colors={['#300033', '#4a154b']} style={styles.hero}>
               <View style={styles.avatarWrap}>
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{initials}</Text>
+                  {user.avatar ? (
+                    <Image source={{ uri: user.avatar }} style={styles.avatarImg} />
+                  ) : (
+                    <Text style={styles.avatarText}>{initials}</Text>
+                  )}
                 </View>
                 <View style={[styles.statusDot, { backgroundColor: statusConf.color }]} />
               </View>
@@ -219,7 +224,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center', alignItems: 'center',
     borderWidth: 3, borderColor: 'rgba(255,255,255,0.2)',
+    overflow: 'hidden',
   },
+  avatarImg: { width: '100%', height: '100%' },
   avatarText: { fontSize: 36, fontWeight: '800', color: 'white' },
   statusDot: {
     position: 'absolute', bottom: 2, right: 2,

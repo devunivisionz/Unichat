@@ -14,9 +14,14 @@ router.get('/', authenticate, async (req, res) => {
     const results = {};
     const regex = new RegExp(q, 'i');
 
+    // Get channels where user is a member
+    const userChannels = await Channel.find({ workspace: workspaceId, 'members.user': req.userId }).select('_id');
+    const channelIds = userChannels.map(c => c._id);
+
     if (type === 'all' || type === 'messages') {
       results.messages = await Message.find({
         workspace: workspaceId,
+        channel: { $in: channelIds },
         content: { $regex: regex },
         isDeleted: false,
         'thread.parentMessage': null,
@@ -30,9 +35,9 @@ router.get('/', authenticate, async (req, res) => {
 
     if (type === 'all' || type === 'channels') {
       results.channels = await Channel.find({
+        _id: { $in: channelIds },
         workspace: workspaceId,
         name: { $regex: regex },
-        type: 'public',
         isArchived: false,
       }).limit(parseInt(limit)).lean();
     }
@@ -54,6 +59,7 @@ router.get('/', authenticate, async (req, res) => {
     if (type === 'all' || type === 'files') {
       results.files = await Message.find({
         workspace: workspaceId,
+        channel: { $in: channelIds },
         'attachments.0': { $exists: true },
         isDeleted: false,
       })

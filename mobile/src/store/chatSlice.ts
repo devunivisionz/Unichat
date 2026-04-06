@@ -58,6 +58,7 @@ interface ChatState {
   isLoadingMessages: boolean;
   typingUsers: Record<string, TypingUser[]>;
   isLoadingChannels: boolean;
+  activeWorkspaceId: string | null;
 }
 
 const initialState: ChatState = {
@@ -71,6 +72,7 @@ const initialState: ChatState = {
   isLoadingMessages: false,
   typingUsers: {},
   isLoadingChannels: false,
+  activeWorkspaceId: null,
 };
 
 export const fetchChannels = createAsyncThunk(
@@ -162,6 +164,9 @@ const chatSlice = createSlice({
       state.activeDMId = action.payload;
       state.activeChannelId = null;
     },
+    setActiveWorkspace(state, action: PayloadAction<string | null>) {
+      state.activeWorkspaceId = action.payload;
+    },
     addMessage(state, action: PayloadAction<{ roomId: string; message: Message }>) {
       const { roomId, message } = action.payload;
       if (!state.messages[roomId]) state.messages[roomId] = [];
@@ -244,6 +249,16 @@ const chatSlice = createSlice({
         if (msg) msg.thread.replyCount += 1;
       }
     },
+    removeChannel(state, action: PayloadAction<string>) {
+      state.channels = state.channels.filter(c => c._id !== action.payload);
+      delete state.messages[action.payload];
+      if (state.activeChannelId === action.payload) state.activeChannelId = null;
+    },
+    removeDM(state, action: PayloadAction<string>) {
+      state.dms = state.dms.filter(d => d._id !== action.payload);
+      delete state.messages[action.payload];
+      if (state.activeDMId === action.payload) state.activeDMId = null;
+    },
   },
   extraReducers: (builder) => {
     // Fetch channels
@@ -307,9 +322,10 @@ const chatSlice = createSlice({
 });
 
 export const {
-  setActiveChannel, setActiveDM, addMessage, updateMessage, deleteMessage,
+  setActiveChannel, setActiveDM, setActiveWorkspace, addMessage, updateMessage, deleteMessage,
   updateReactions, addThreadReply, setTypingUsers, markChannelRead, markDMRead,
   updatePresence, addChannel, addDM, updateThreadReplyCount,
+  removeChannel, removeDM,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

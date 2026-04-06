@@ -114,6 +114,7 @@ export const api = {
     leave: (id: string) => api.post(`/channels/${id}/leave`),
     markRead: (id: string) => api.put(`/channels/${id}/mark-read`),
     invite: (id: string, userIds: string[]) => api.post(`/channels/${id}/invite`, { userIds }),
+    removeMember: (id: string, userId: string) => api.delete(`/channels/${id}/members/${userId}`),
   },
 
   // Messages

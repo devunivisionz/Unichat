@@ -4,13 +4,14 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../../src/utils/theme';
 import { useAppDispatch, useAppSelector } from '../../../src/hooks/redux';
 import { api } from '../../../src/services/api';
-import { createDM, fetchChannels, fetchDMs, setActiveChannel, setActiveDM } from '../../../src/store/chatSlice';
+import { createDM, fetchChannels, fetchDMs, setActiveChannel, setActiveDM, setActiveWorkspace } from '../../../src/store/chatSlice';
 import { fetchNotifications } from '../../../src/store/notificationSlice';
 import { fetchWorkspace } from '../../../src/store/workspaceSlice';
 import { useSocketEvents } from '../../../src/hooks/useSocketEvents';
@@ -50,7 +51,7 @@ export default function WorkspaceScreen() {
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
   const [startingDMUserId, setStartingDMUserId] = useState<string | null>(null);
 
-  useSocketEvents(workspaceKey || null);
+
 
   const loadWorkspaceData = React.useCallback(async () => {
     if (!workspaceKey) return;
@@ -59,6 +60,7 @@ export default function WorkspaceScreen() {
     dispatch(fetchChannels(workspaceKey));
     dispatch(fetchDMs(workspaceKey));
     dispatch(fetchNotifications(1));
+    dispatch(setActiveWorkspace(workspaceKey));
 
     try {
       const result = await api.workspaces.members(workspaceKey);
@@ -229,7 +231,11 @@ export default function WorkspaceScreen() {
         >
           <View style={styles.dmAvatarWrap}>
             <View style={styles.dmAvatar}>
-              <Text style={styles.dmAvatarText}>{initials}</Text>
+              {item.user.avatar ? (
+                <Image source={{ uri: item.user.avatar }} style={styles.avatarImg} />
+              ) : (
+                <Text style={styles.dmAvatarText}>{initials}</Text>
+              )}
             </View>
             <StatusDot status={item.user.status || 'offline'} />
           </View>
@@ -479,7 +485,9 @@ const styles = StyleSheet.create({
     width: 32, height: 32, borderRadius: 10,
     backgroundColor: Colors.surfaceContainer,
     justifyContent: 'center', alignItems: 'center',
+    overflow: 'hidden',
   },
+  avatarImg: { width: '100%', height: '100%' },
   dmAvatarText: { fontSize: 12, fontWeight: '700', color: Colors.onSurfaceVariant },
   dmInfo: { flex: 1 },
   dmPreview: { fontSize: 12, color: Colors.onSurfaceVariant, marginTop: 1 },

@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../../src/utils/theme';
 import { useAppDispatch, useAppSelector } from '../../../src/hooks/redux';
-import { fetchChannelMessages, sendMessage, markChannelRead } from '../../../src/store/chatSlice';
+import { fetchChannelMessages, sendMessage, markChannelRead, setActiveWorkspace } from '../../../src/store/chatSlice';
 import { joinChannel, leaveChannel, startTyping, stopTyping } from '../../../src/services/socket';
 import MessageBubble from '../../../src/components/MessageBubble';
 import TypingIndicator from '../../../src/components/TypingIndicator';
@@ -42,6 +42,7 @@ export default function ChannelScreen() {
 
   useEffect(() => {
     if (!channelKey) return;
+    if (workspaceKey) dispatch(setActiveWorkspace(workspaceKey));
     joinChannel(channelKey);
     dispatch(fetchChannelMessages({ channelId: channelKey }));
     dispatch(markChannelRead(channelKey));
@@ -49,7 +50,7 @@ export default function ChannelScreen() {
       leaveChannel(channelKey);
       if (typingTimeout.current) clearTimeout(typingTimeout.current);
     };
-  }, [channelKey, dispatch]);
+  }, [channelKey, dispatch, workspaceKey]);
 
   const handleSend = async () => {
     if ((!inputText.trim() && !pendingAttachment) || isSending || !channelKey || !workspaceKey) return;
@@ -168,7 +169,7 @@ export default function ChannelScreen() {
             <TouchableOpacity style={styles.iconBtn} onPress={() => router.push(`/(app)/search/${workspaceKey}`)}>
               <Ionicons name="search" size={20} color={Colors.onSurfaceVariant} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconBtn}>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => router.push(`/(app)/channel-members?channelId=${channelKey}&workspaceId=${workspaceKey}`)}>
               <Ionicons name="people-outline" size={20} color={Colors.onSurfaceVariant} />
             </TouchableOpacity>
           </View>

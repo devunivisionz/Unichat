@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
+import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../../src/utils/theme';
 import { useAppDispatch, useAppSelector } from '../../../src/hooks/redux';
-import { fetchDMMessages, sendMessage, markDMRead } from '../../../src/store/chatSlice';
+import { fetchDMMessages, sendMessage, markDMRead, setActiveWorkspace } from '../../../src/store/chatSlice';
 import { joinDM, leaveDM, startTyping, stopTyping } from '../../../src/services/socket';
 import MessageBubble from '../../../src/components/MessageBubble';
 import TypingIndicator from '../../../src/components/TypingIndicator';
@@ -42,11 +43,12 @@ export default function DMScreen() {
 
   useEffect(() => {
     if (!dmKey) return;
+    if (workspaceKey) dispatch(setActiveWorkspace(workspaceKey));
     joinDM(dmKey);
     dispatch(fetchDMMessages({ dmId: dmKey }));
     dispatch(markDMRead(dmKey));
     return () => { leaveDM(dmKey); if (typingTimeout.current) clearTimeout(typingTimeout.current); };
-  }, [dispatch, dmKey]);
+  }, [dispatch, dmKey, workspaceKey]);
 
   const handleSend = async () => {
     if ((!inputText.trim() && !pendingAttachment) || isSending || !dmKey || !workspaceKey) return;
@@ -90,7 +92,11 @@ export default function DMScreen() {
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}><Ionicons name="arrow-back" size={22} color={Colors.primary} /></TouchableOpacity>
           <TouchableOpacity style={styles.headerAvatar} onPress={() => otherUser && router.push(`/(app)/profile/${otherUser._id}`)}>
-            <Text style={styles.headerAvatarText}>{dmName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}</Text>
+            {otherUser?.avatar ? (
+              <Image source={{ uri: otherUser.avatar }} style={styles.avatarImg} />
+            ) : (
+              <Text style={styles.headerAvatarText}>{dmName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}</Text>
+            )}
             {!dm?.isGroup && otherUser && <View style={[styles.onlineDot, { backgroundColor: statusColors[otherUser.status] || Colors.statusOffline }]} />}
           </TouchableOpacity>
           <View style={styles.headerInfo}>
@@ -164,7 +170,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.surface }, safe: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, backgroundColor: Colors.surfaceContainerLowest, borderBottomWidth: 1, borderBottomColor: Colors.surfaceContainerLow, gap: 8 },
   backBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  headerAvatar: { width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.surfaceContainerHigh, justifyContent: 'center', alignItems: 'center', position: 'relative' },
+  headerAvatar: { width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.surfaceContainerHigh, justifyContent: 'center', alignItems: 'center', position: 'relative', overflow: 'hidden' },
+  avatarImg: { width: '100%', height: '100%' },
   headerAvatarText: { fontSize: 12, fontWeight: '700', color: Colors.onSurfaceVariant },
   onlineDot: { position: 'absolute', bottom: -1, right: -1, width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: Colors.surfaceContainerLowest },
   headerInfo: { flex: 1 }, dmName: { fontSize: 16, fontWeight: '700', color: Colors.primary }, dmStatus: { fontSize: 11, color: Colors.onSurfaceVariant, textTransform: 'capitalize' },

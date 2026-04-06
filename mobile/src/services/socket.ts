@@ -1,6 +1,22 @@
 import { io, Socket } from 'socket.io-client';
+import Constants from 'expo-constants';
 
-const SOCKET_URL = __DEV__ ? 'http://192.168.1.56:4001' : 'https://your-production-server.com';
+const getSocketUrl = () => {
+  if (!__DEV__) return 'https://your-production-server.com';
+  
+  // Try to get the hostUri (e.g. 192.168.1.56:8081) and replace port with 4001
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const ip = hostUri.split(':')[0];
+    return `http://${ip}:4001`;
+  }
+  
+  // Fallback to localhost (works for emulators)
+  return 'http://localhost:4001';
+};
+
+const SOCKET_URL = getSocketUrl();
+console.log('🔌 Resolved SOCKET_URL:', SOCKET_URL);
 
 let socket: Socket | null = null;
 

@@ -9,7 +9,20 @@ router.get('/profile/:userId', authenticate, async (req, res) => {
   try {
     const user = await User.findById(req.params.userId).lean();
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ user: { _id: user._id, username: user.username, displayName: user.displayName, avatar: user.avatar, status: user.status, statusMessage: user.statusMessage, bio: user.bio, title: user.title, timezone: user.timezone, lastSeen: user.lastSeen, createdAt: user.createdAt } });
+    res.json({ user: { 
+      _id: user._id, 
+      username: user.username, 
+      displayName: user.displayName, 
+      avatar: user.avatar, 
+      avatarPublicId: user.avatarPublicId,
+      status: user.status, 
+      statusMessage: user.statusMessage, 
+      bio: user.bio, 
+      title: user.title, 
+      timezone: user.timezone, 
+      lastSeen: user.lastSeen, 
+      createdAt: user.createdAt 
+    } });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch profile' });
   }
@@ -30,7 +43,22 @@ router.put('/profile', authenticate, [
     const updates = {};
     const fields = ['displayName', 'bio', 'title', 'timezone', 'phone', 'status', 'statusMessage', 'theme'];
     fields.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
-    if (req.body.avatar) updates.avatar = req.body.avatar;
+    
+    if (req.body.avatar) {
+      updates.avatar = req.body.avatar;
+      if (req.body.avatarPublicId) {
+        updates.avatarPublicId = req.body.avatarPublicId;
+        
+        // Delete old avatar from Cloudinary if it exists
+        const user = await User.findById(req.userId);
+        if (user && user.avatarPublicId && process.env.CLOUDINARY_CLOUD_NAME) {
+          const cloudinary = require('cloudinary').v2;
+          cloudinary.uploader.destroy(user.avatarPublicId).catch(err => {
+            console.error('Failed to delete old avatar:', err);
+          });
+        }
+      }
+    }
 
     const user = await User.findByIdAndUpdate(req.userId, updates, { new: true });
     if (!user) return res.status(404).json({ error: 'User not found' });

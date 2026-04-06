@@ -91,6 +91,20 @@ router.post('/', authenticate, [
       return res.status(400).json({ error: 'channelId or dmId required' });
     }
 
+    // Membership verification
+    if (channelId) {
+      const channel = await Channel.findById(channelId);
+      if (!channel || !channel.isMember(req.userId)) {
+        return res.status(403).json({ error: 'Not a member of this channel' });
+      }
+    } else if (dmId) {
+      const DirectMessage = require('../models/DirectMessage');
+      const dm = await DirectMessage.findById(dmId);
+      if (!dm || !dm.participants.some(p => p.toString() === req.userId)) {
+        return res.status(403).json({ error: 'Not a participant in this DM' });
+      }
+    }
+
     const messageData = {
       workspace: workspaceId,
       sender: req.userId,
@@ -202,25 +216,34 @@ router.post('/', authenticate, [
       }
     }
 
+    let insertedNotifications = [];
     if (notificationsToCreate.length) {
-      await Notification.insertMany(notificationsToCreate);
+      insertedNotifications = await Notification.insertMany(notificationsToCreate);
+      insertedNotifications = await Notification.populate(insertedNotifications, [
+        { path: 'actor', select: 'displayName avatar username' },
+        { path: 'message', select: 'content' },
+        { path: 'channel', select: 'name' }
+      ]);
     }
 
     // Emit via socket
     const io = req.app.get('io');
     const room = channelId ? `channel:${channelId}` : `dm:${dmId}`;
-    io.to(room).emit('message:new', populatedMessage);
+    
+    // Broadcast to the specific channel/DM and the global workspace room for notifications
+    let emitter = io.to(room);
+    if (workspaceId) {
+      emitter = emitter.to(`workspace:${workspaceId}`);
+    }
+    emitter.emit('message:new', populatedMessage);
 
     if (parentMessageId) {
       io.to(`thread:${parentMessageId}`).emit('message:new_reply', populatedMessage);
     }
 
     // Push notification events to recipients
-    notificationsToCreate.forEach(n => {
-      io.to(`user:${n.recipient}`).emit('notification:new', {
-        type: n.type,
-        message: populatedMessage,
-      });
+    insertedNotifications.forEach(n => {
+      io.to(`user:${n.recipient}`).emit('notification:new', n);
     });
 
     res.status(201).json({ message: populatedMessage });
@@ -282,6 +305,19 @@ router.delete('/:messageId', authenticate, async (req, res) => {
 
     if (!isSender && !isAdmin) {
       return res.status(403).json({ error: 'Not authorized to delete this message' });
+    }
+
+    // Clean up Cloudinary attachments if any
+    if (message.attachments && message.attachments.length > 0 && process.env.CLOUDINARY_CLOUD_NAME) {
+      const cloudinary = require('cloudinary').v2;
+      for (const att of message.attachments) {
+        if (att.publicId) {
+          const resourceType = att.type === 'video' || att.type === 'audio' ? 'video' : att.type === 'image' ? 'image' : 'raw';
+          cloudinary.uploader.destroy(att.publicId, { resource_type: resourceType }).catch(err => {
+            console.error('Failed to delete attachment from Cloudinary:', err);
+          });
+        }
+      }
     }
 
     message.isDeleted = true;

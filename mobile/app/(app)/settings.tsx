@@ -3,14 +3,18 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
   Alert, Switch, ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius } from '../../src/utils/theme';
 import { useAppDispatch, useAppSelector } from '../../src/hooks/redux';
-import { logout, updateProfile } from '../../src/store/authSlice';
+import { logout, updateProfile, setSoundEnabled } from '../../src/store/authSlice';
+import * as ImagePicker from 'expo-image-picker';
+import { api } from '../../src/services/api';
 import { updatePresence } from '../../src/services/socket';
+import { soundService } from '../../src/utils/SoundService';
 
 const STATUS_OPTIONS = [
   { key: 'online', label: 'Online', color: Colors.statusOnline },
@@ -21,13 +25,14 @@ const STATUS_OPTIONS = [
 export default function SettingsScreen() {
   const dispatch = useAppDispatch();
   const user = useAppSelector(s => s.auth.user);
+  const soundEnabled = useAppSelector(s => s.auth.soundEnabled);
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [title, setTitle] = useState(user?.title || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [isSaving, setIsSaving] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-  const [notifications, setNotifications] = useState(true);
+  const [pushNotifications, setPushNotifications] = useState(true);
 
   const initials = user?.displayName?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U';
 
@@ -46,6 +51,43 @@ export default function SettingsScreen() {
   const handleStatusChange = async (status: string) => {
     updatePresence(status);
     await dispatch(updateProfile({ status: status as any }));
+  };
+
+  const handleAvatarEdit = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission denied', 'Sorry, we need camera roll permissions to make this work!');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setIsSaving(true);
+      try {
+        const asset = result.assets[0];
+        const uploadResult = await api.files.upload({
+          uri: asset.uri,
+          name: asset.fileName || `avatar_${user?._id}.jpg`,
+          type: asset.mimeType || 'image/jpeg',
+        });
+
+        await dispatch(updateProfile({ 
+          avatar: uploadResult.url,
+          avatarPublicId: uploadResult.publicId 
+        }));
+        Alert.alert('Success', 'Profile picture updated');
+      } catch (err: any) {
+        Alert.alert('Error', err.message || 'Failed to upload profile picture');
+      } finally {
+        setIsSaving(false);
+      }
+    }
   };
 
   const handleLogout = () => {
@@ -89,9 +131,13 @@ export default function SettingsScreen() {
           <View style={styles.profileHero}>
             <View style={styles.avatarWrap}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{initials}</Text>
+                {user?.avatar ? (
+                  <Image source={{ uri: user.avatar }} style={styles.avatarImg} />
+                ) : (
+                  <Text style={styles.avatarText}>{initials}</Text>
+                )}
               </View>
-              <TouchableOpacity style={styles.avatarEditBtn}>
+              <TouchableOpacity style={styles.avatarEditBtn} onPress={handleAvatarEdit}>
                 <Ionicons name="camera" size={14} color="white" />
               </TouchableOpacity>
               <View style={[styles.statusIndicator, { backgroundColor: STATUS_OPTIONS.find(s => s.key === user?.status)?.color || Colors.statusOffline }]} />
@@ -205,12 +251,34 @@ export default function SettingsScreen() {
                 <Ionicons name="notifications-outline" size={18} color={Colors.primary} />
               </View>
               <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Notifications</Text>
-                <Text style={styles.settingValue}>Manage push and in-app alerts</Text>
+                <Text style={styles.settingTitle}>Push Notifications</Text>
+                <Text style={styles.settingValue}>Deliver alerts while app is closed</Text>
               </View>
               <Switch
-                value={notifications}
-                onValueChange={setNotifications}
+                value={pushNotifications}
+                onValueChange={setPushNotifications}
+                trackColor={{ false: Colors.surfaceContainerHigh, true: Colors.primary }}
+                thumbColor="white"
+              />
+            </View>
+            <View style={styles.settingRow}>
+              <View style={styles.settingIconWrap}>
+                <Ionicons name="volume-high-outline" size={18} color={Colors.primary} />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Sound Notifications</Text>
+                <Text style={styles.settingValue}>Play a tone for new activity</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.testSoundBtn}
+                onPress={() => { soundService.playNotification(); }}
+              >
+                <Ionicons name="play" size={16} color={Colors.primary} />
+                <Text style={styles.testSoundText}>Test</Text>
+              </TouchableOpacity>
+              <Switch
+                value={soundEnabled}
+                onValueChange={(val) => { dispatch(setSoundEnabled(val)); }}
                 trackColor={{ false: Colors.surfaceContainerHigh, true: Colors.primary }}
                 thumbColor="white"
               />
@@ -234,15 +302,6 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             ))}
           </View>
-
-          {/* Upgrade card */}
-          <LinearGradient colors={['#4a154b', '#300033']} style={styles.upgradeCard}>
-            <Text style={styles.upgradeTitle}>Unichat Pro</Text>
-            <Text style={styles.upgradeText}>Unlock advanced tools and custom workspace themes.</Text>
-            <TouchableOpacity style={styles.upgradeBtn}>
-              <Text style={styles.upgradeBtnText}>Upgrade Now</Text>
-            </TouchableOpacity>
-          </LinearGradient>
 
           {/* Logout */}
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
@@ -277,7 +336,9 @@ const styles = StyleSheet.create({
     width: 88, height: 88, borderRadius: 24,
     backgroundColor: Colors.primaryContainer,
     justifyContent: 'center', alignItems: 'center',
+    overflow: 'hidden',
   },
+  avatarImg: { width: '100%', height: '100%' },
   avatarText: { fontSize: 28, fontWeight: '800', color: Colors.onPrimary },
   avatarEditBtn: {
     position: 'absolute', bottom: -4, right: -4,
@@ -336,17 +397,16 @@ const styles = StyleSheet.create({
   settingInfo: { flex: 1 },
   settingTitle: { fontSize: 15, fontWeight: '600', color: Colors.onSurface },
   settingValue: { fontSize: 12, color: Colors.onSurfaceVariant, marginTop: 2 },
-  upgradeCard: { borderRadius: BorderRadius.xl, padding: Spacing.xl, marginBottom: Spacing.lg },
-  upgradeTitle: { fontSize: 18, fontWeight: '700', color: 'white', marginBottom: 6 },
-  upgradeText: { fontSize: 13, color: 'rgba(255,255,255,0.8)', lineHeight: 20, marginBottom: Spacing.lg },
-  upgradeBtn: {
-    backgroundColor: Colors.secondaryContainer, borderRadius: BorderRadius.lg,
-    paddingVertical: 10, paddingHorizontal: Spacing.xl, alignSelf: 'flex-start',
-  },
-  upgradeBtnText: { fontSize: 13, fontWeight: '700', color: Colors.primary },
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, paddingVertical: Spacing.xl,
   },
   logoutText: { fontSize: 15, fontWeight: '700', color: Colors.error },
+  testSoundBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: Colors.surfaceContainerHighest,
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: BorderRadius.full, marginRight: 8,
+  },
+  testSoundText: { fontSize: 12, fontWeight: '700', color: Colors.primary },
 });

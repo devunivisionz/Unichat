@@ -9,6 +9,12 @@ import { useAppDispatch, useAppSelector } from '../src/hooks/redux';
 import { initializeAuth } from '../src/store/authSlice';
 import { View, ActivityIndicator } from 'react-native';
 import { Colors } from '../src/utils/theme';
+import { useSocketEvents } from '../src/hooks/useSocketEvents';
+
+function SocketEventsHandler() {
+  useSocketEvents();
+  return null;
+}
 
 function RootLayout() {
   const dispatch = useAppDispatch();
@@ -38,22 +44,25 @@ function RootLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="(app)/workspaces" />
-      <Stack.Screen name="(app)/workspace/[workspaceId]" />
-      <Stack.Screen name="(app)/dms/[workspaceId]" />
-      <Stack.Screen name="(app)/channel/[channelId]" />
-      <Stack.Screen name="(app)/dm/[dmId]" />
-      <Stack.Screen name="(app)/thread/[messageId]" />
-      <Stack.Screen name="(app)/search/[workspaceId]" />
-      <Stack.Screen name="(app)/profile/[userId]" />
-      <Stack.Screen name="(app)/starred/[workspaceId]" />
-      <Stack.Screen name="(app)/settings" />
-      <Stack.Screen name="(app)/create-channel/[workspaceId]" />
-      <Stack.Screen name="(app)/create-workspace" />
-      <Stack.Screen name="(app)/notifications" />
-    </Stack>
+    <>
+      <SocketEventsHandler />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(app)/workspaces" />
+        <Stack.Screen name="(app)/workspace/[workspaceId]" />
+        <Stack.Screen name="(app)/dms/[workspaceId]" />
+        <Stack.Screen name="(app)/channel/[channelId]" />
+        <Stack.Screen name="(app)/dm/[dmId]" />
+        <Stack.Screen name="(app)/thread/[messageId]" />
+        <Stack.Screen name="(app)/search/[workspaceId]" />
+        <Stack.Screen name="(app)/profile/[userId]" />
+        <Stack.Screen name="(app)/starred/[workspaceId]" />
+        <Stack.Screen name="(app)/settings" />
+        <Stack.Screen name="(app)/create-channel/[workspaceId]" />
+        <Stack.Screen name="(app)/create-workspace" />
+        <Stack.Screen name="(app)/notifications" />
+      </Stack>
+    </>
   );
 }
 

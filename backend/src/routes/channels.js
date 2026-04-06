@@ -4,6 +4,7 @@ const { body, validationResult } = require('express-validator');
 const Channel = require('../models/Channel');
 const Workspace = require('../models/Workspace');
 const Message = require('../models/Message');
+const User = require('../models/User');
 const { authenticate } = require('../middleware/auth');
 
 // GET /api/channels/workspace/:workspaceId
@@ -17,10 +18,7 @@ router.get('/workspace/:workspaceId', authenticate, async (req, res) => {
     const channels = await Channel.find({
       workspace: req.params.workspaceId,
       isArchived: false,
-      $or: [
-        { type: 'public' },
-        { 'members.user': req.userId },
-      ],
+      'members.user': req.userId,
     }).populate('createdBy', 'displayName username').sort({ name: 1 });
 
     // Attach unread counts
@@ -120,8 +118,8 @@ router.get('/:channelId', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Not a member' });
     }
 
-    if (channel.type === 'private' && !channel.isMember(req.userId)) {
-      return res.status(403).json({ error: 'Private channel' });
+    if (!channel.isMember(req.userId)) {
+      return res.status(403).json({ error: 'Not a member of this channel' });
     }
 
     res.json({ channel });
@@ -217,18 +215,77 @@ router.post('/:channelId/invite', authenticate, async (req, res) => {
     const channel = await Channel.findById(req.params.channelId);
     if (!channel) return res.status(404).json({ error: 'Not found' });
 
+    const member = channel.members.find(m => m.user.toString() === req.userId);
+    if (!member || member.role !== 'admin') return res.status(403).json({ error: 'Admin required' });
+
     const newMembers = userIds.filter(uid => !channel.isMember(uid));
     newMembers.forEach(uid => channel.members.push({ user: uid, role: 'member' }));
     await channel.save();
 
     const io = req.app.get('io');
-    newMembers.forEach(uid => {
+    for (const uid of newMembers) {
       io.to(`user:${uid}`).emit('channel:invited', { channelId: channel._id });
-    });
+      
+      const addedUser = await User.findById(uid);
+      if (addedUser) {
+        const sysMsg = await Message.create({
+          workspace: channel.workspace,
+          channel: channel._id,
+          sender: req.userId,
+          content: `invited ${addedUser.displayName} to the channel`,
+          isSystemMessage: true,
+          systemMessageType: 'user_joined'
+        });
+        io.to(`channel:${channel._id}`).emit('message:new', await sysMsg.populate('sender', 'displayName avatar username'));
+      }
+    }
 
     res.json({ channel });
   } catch (err) {
     res.status(500).json({ error: 'Failed to invite members' });
+  }
+});
+
+// DELETE /api/channels/:channelId/members/:memberId
+router.delete('/:channelId/members/:memberId', authenticate, async (req, res) => {
+  try {
+    const channel = await Channel.findById(req.params.channelId);
+    if (!channel) return res.status(404).json({ error: 'Not found' });
+
+    const member = channel.members.find(m => m.user.toString() === req.userId);
+    if (!member || member.role !== 'admin') return res.status(403).json({ error: 'Admin required' });
+
+    if (req.params.memberId === req.userId) {
+      return res.status(400).json({ error: 'Cannot remove yourself' });
+    }
+
+    if (!channel.isMember(req.params.memberId)) {
+       return res.status(400).json({ error: 'User is not a member' });
+    }
+
+    channel.members = channel.members.filter(m => m.user.toString() !== req.params.memberId);
+    await channel.save();
+
+    const io = req.app.get('io');
+    io.to(`channel:${channel._id}`).emit('channel:member_left', { channelId: channel._id, userId: req.params.memberId });
+    io.to(`user:${req.params.memberId}`).emit('channel:removed', { channelId: channel._id });
+
+    const removedUser = await User.findById(req.params.memberId);
+    if (removedUser) {
+      const sysMsg = await Message.create({
+        workspace: channel.workspace,
+        channel: channel._id,
+        sender: req.userId,
+        content: `removed ${removedUser.displayName} from the channel`,
+        isSystemMessage: true,
+        systemMessageType: 'user_left'
+      });
+      io.to(`channel:${channel._id}`).emit('message:new', await sysMsg.populate('sender', 'displayName avatar username'));
+    }
+
+    res.json({ message: 'Member removed', channel });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to remove member' });
   }
 });
 

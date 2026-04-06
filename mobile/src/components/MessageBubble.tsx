@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, Alert } from 'react-native';
+import { Image } from 'expo-image';
+import * as Linking from 'expo-linking';
 import { Ionicons } from '@expo/vector-icons';
 import { format, isToday, isYesterday } from 'date-fns';
 import { Colors, Spacing, BorderRadius } from '../utils/theme';
@@ -58,6 +60,12 @@ export default function MessageBubble({ message, isMe, showAvatar, onReact, onOp
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [mediaViewer, setMediaViewer] = useState<{ uri: string; type: 'image' | 'video'; name?: string } | null>(null);
 
+  const handleFileOpen = (url: string) => {
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Error', 'Failed to open file');
+    });
+  };
+
   if (message.isDeleted) {
     return (
       <View style={[styles.wrapper, !showAvatar && styles.wrapperContinuation]}>
@@ -114,11 +122,11 @@ export default function MessageBubble({ message, isMe, showAvatar, onReact, onOp
       );
     }
     return (
-      <View key={i} style={[styles.attachment, styles.fileAttachment]}>
+      <TouchableOpacity key={i} style={[styles.attachment, styles.fileAttachment]} onPress={() => handleFileOpen(att.url)}>
         <View style={styles.fileIcon}><Ionicons name={getFileIcon(att.mimeType) as any} size={22} color={Colors.primary} /></View>
         <View style={styles.fileInfo}><Text style={styles.fileName} numberOfLines={1}>{att.name || 'File'}</Text><Text style={styles.fileSize}>{att.mimeType?.split('/')[1]?.toUpperCase() || 'FILE'} · {formatFileSize(att.size)}</Text></View>
-        <TouchableOpacity style={styles.downloadBtn}><Ionicons name="download-outline" size={20} color={Colors.onSurfaceVariant} /></TouchableOpacity>
-      </View>
+        <Ionicons name="open-outline" size={20} color={Colors.onSurfaceVariant} />
+      </TouchableOpacity>
     );
   };
 

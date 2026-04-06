@@ -45,6 +45,7 @@ userSchema.methods.toPublicJSON = function () {
     email: this.email,
     displayName: this.displayName,
     avatar: this.avatar,
+    avatarPublicId: this.avatarPublicId,
     status: this.status,
     statusMessage: this.statusMessage,
     bio: this.bio,

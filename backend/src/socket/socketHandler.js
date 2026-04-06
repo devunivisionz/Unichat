@@ -29,8 +29,17 @@ module.exports = (io) => {
     if (!onlineUsers.has(userId)) onlineUsers.set(userId, new Set());
     onlineUsers.get(userId).add(socket.id);
 
-    // Join personal room for direct notifications
     socket.join(`user:${userId}`);
+    console.log(`🔌 User ${userId} joined personal room`);
+    
+    // Automatically join all user workspaces
+    if (socket.user && socket.user.workspaces) {
+      socket.user.workspaces.forEach(wsId => {
+        const room = `workspace:${wsId}`;
+        socket.join(room);
+        console.log(`📦 User ${userId} auto-joined workspace room: ${wsId}`);
+      });
+    }
 
     // Update status to online
     await User.findByIdAndUpdate(userId, { status: 'online', lastSeen: new Date() });
